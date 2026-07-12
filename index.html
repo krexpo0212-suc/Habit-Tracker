@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>Daily Ops — Rokith</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#0B0E11; --panel:#12161B; --panel2:#181D24; --line:#232A33;
+    --ink:#E8EDF2; --dim:#7C8794; --signal:#F2A93B; --good:#3BB273;
+    --bad:#D9534F; --water:#4C9CE8;
+    --mono:'SF Mono', ui-monospace, 'Courier New', monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; padding-bottom:60px;}
+  header{padding:20px 18px 12px; border-bottom:1px solid var(--line); position:sticky; top:0; background:var(--bg); z-index:10;}
+  .eyebrow{font-family:var(--mono); font-size:11px; letter-spacing:2px; color:var(--signal); text-transform:uppercase;}
+  h1{margin:4px 0 2px; font-size:21px; font-weight:700;}
+  .datebar{display:flex; align-items:center; gap:10px; margin-top:10px;}
+  .datebar button{background:var(--panel2); border:1px solid var(--line); color:var(--ink); width:34px; height:34px; border-radius:8px; font-size:16px; cursor:pointer;}
+  .dateLabel{font-family:var(--mono); font-size:13px; color:var(--dim); flex:1;}
+  .savedLine{font-family:var(--mono); font-size:10px; color:var(--good); margin-top:4px; min-height:14px;}
+  .tabs{display:flex; margin-top:12px; border-bottom:1px solid var(--line); overflow-x:auto;}
+  .tab{flex:1; text-align:center; padding:10px 4px; font-size:12px; color:var(--dim); cursor:pointer; border-bottom:2px solid transparent; font-weight:600; white-space:nowrap;}
+  .tab.active{color:var(--signal); border-bottom-color:var(--signal);}
+  main{padding:16px;}
+  .view{display:none;} .view.active{display:block;}
+  .section-title{font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:1px; margin:20px 0 8px;}
+  .section-title:first-child{margin-top:0;}
+
+  textarea.note, input.textin{
+    width:100%; background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    color:var(--ink); padding:10px; font-size:13px; margin-top:8px; font-family:inherit;
+  }
+  textarea.note{min-height:60px; resize:vertical;}
+
+  .same-reason-bar{
+    display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:12px 14px; margin-bottom:12px;
+  }
+  .same-reason-bar span{font-size:12.5px; color:var(--dim); flex:1;}
+  .switch{position:relative; width:42px; height:24px; flex-shrink:0;}
+  .switch input{opacity:0; width:0; height:0;}
+  .slider{position:absolute; inset:0; background:#2A323C; border-radius:20px; cursor:pointer; transition:.2s;}
+  .slider:before{content:""; position:absolute; height:18px; width:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;}
+  input:checked + .slider{background:var(--signal);}
+  input:checked + .slider:before{transform:translateX(18px);}
+
+  .block{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    padding:12px 14px; margin-bottom:8px;
+  }
+  .block.done{border-color:var(--good);}
+  .block.excepted{border-color:var(--signal); opacity:0.85;}
+  .block-top{display:flex; align-items:flex-start; gap:12px;}
+  .check{
+    width:22px; height:22px; border-radius:6px; border:2px solid var(--line);
+    flex-shrink:0; margin-top:2px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    font-size:14px; color:transparent;
+  }
+  .check.on{background:var(--good); border-color:var(--good); color:#0B0E11;}
+  .check.disabled{opacity:0.3; cursor:not-allowed;}
+  .btxt{flex:1;}
+  .btime{font-family:var(--mono); font-size:11px; color:var(--signal); letter-spacing:.5px;}
+  .blabel{font-size:14px; margin-top:2px; font-weight:600;}
+  .bcat{font-size:11px; color:var(--dim); margin-top:1px;}
+  .exc-pill{
+    font-size:10.5px; padding:5px 9px; border-radius:20px; border:1px solid var(--line);
+    color:var(--dim); cursor:pointer; white-space:nowrap; flex-shrink:0; align-self:flex-start;
+  }
+  .exc-pill.on{background:var(--signal); color:#151109; border-color:var(--signal); font-weight:700;}
+  .reason-wrap{margin-top:8px;}
+  .quality-row{display:flex; gap:8px; margin-top:8px;}
+  .quality-pill{flex:1; text-align:center; font-size:11.5px; padding:8px 4px; border-radius:8px; border:1px solid var(--line); background:var(--panel2); color:var(--dim); cursor:pointer; font-weight:600;}
+  .quality-pill[data-q="good"].on{background:var(--good); border-color:var(--good); color:#0B0E11;}
+  .quality-pill[data-q="medium"].on{background:var(--signal); border-color:var(--signal); color:#151109;}
+  .quality-pill[data-q="bad"].on{background:var(--bad); border-color:var(--bad); color:#fff;}
+
+  .card{background:linear-gradient(160deg,var(--panel2),var(--panel)); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;}
+  .card-title{font-size:13px; color:var(--dim); margin-bottom:10px;}
+
+  .row-center{display:flex; align-items:center; gap:14px;}
+  .counter-sub{font-size:11px; color:var(--dim);}
+
+  .water-track{display:flex; gap:5px; flex-wrap:wrap; margin-top:10px;}
+  .water-drop{width:26px; height:26px; border-radius:7px; border:1px solid var(--line); background:var(--panel2); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:12px;}
+  .water-drop.on{background:var(--water); border-color:var(--water);}
+
+  .stars{display:flex; gap:6px; margin-top:6px;}
+  .star{font-size:24px; cursor:pointer; color:#2A323C;}
+  .star.on{color:var(--signal);}
+
+  .session-row{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+  .session-row select{flex:1; background:var(--panel2); border:1px solid var(--line); color:var(--ink); padding:10px; border-radius:8px; font-size:13px;}
+  .session-row button{background:var(--signal); border:none; color:#151109; font-weight:700; padding:10px 16px; border-radius:8px; cursor:pointer; font-size:13px;}
+  .session-item{display:flex; justify-content:space-between; align-items:center; background:var(--panel2); border:1px solid var(--line); border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12px; color:var(--dim);}
+  .session-item button{background:none; border:none; color:var(--bad); font-size:13px; cursor:pointer; font-weight:700;}
+  .session-total{font-family:var(--mono); font-size:20px; font-weight:700; color:var(--bad); margin-top:8px;}
+  .streak{font-family:var(--mono); font-size:12px; color:var(--good); margin-top:10px;}
+
+  .save-bar{display:flex; gap:10px; margin-top:16px;}
+  .btn{flex:1; padding:13px; border-radius:10px; border:none; font-weight:700; font-size:14px; cursor:pointer;}
+  .btn-primary{background:var(--signal); color:#151109;}
+
+  .month-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-bottom:16px;}
+  .day-cell{aspect-ratio:1; border-radius:8px; background:var(--panel2); border:1px solid var(--line); display:flex; align-items:center; justify-content:center; font-size:11px; font-family:var(--mono); color:var(--dim);}
+  .day-cell.filled{background:#152018; color:var(--good); border-color:var(--good);}
+  .day-cell.today{outline:2px solid var(--signal);}
+
+  .stat-row{display:flex; gap:8px; margin-bottom:14px; flex-wrap:wrap;}
+  .stat{flex:1; min-width:80px; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:center;}
+  .stat-num{font-family:var(--mono); font-size:20px; font-weight:700; color:var(--signal);}
+  .stat-label{font-size:9px; color:var(--dim); margin-top:2px; text-transform:uppercase; letter-spacing:1px;}
+
+  .chart-wrap{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:14px;}
+  .chart-title{font-size:13px; color:var(--dim); margin-bottom:10px;}
+  .chart-canvas-box{position:relative; min-height:180px;}
+  .empty{color:var(--dim); font-size:13px; text-align:center; padding:40px 10px;}
+  .legend{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:11px; color:var(--dim);}
+  .dot{width:9px; height:9px; border-radius:2px; flex-shrink:0;}
+
+  .rating-hero{text-align:center; padding:10px 0 4px;}
+  .rating-stars{font-size:32px; letter-spacing:4px;}
+  .rating-stars .on{color:var(--signal);}
+  .rating-stars .off{color:#2A323C;}
+  .rating-sub{font-size:11px; color:var(--dim); margin-top:6px;}
+
+  .focus-list{margin-top:6px;}
+  .focus-row{display:flex; align-items:center; gap:10px; margin-bottom:10px;}
+  .focus-label{flex:1; font-size:12.5px;}
+  .focus-bar-bg{flex:1.4; height:8px; background:var(--panel2); border-radius:6px; overflow:hidden;}
+  .focus-bar-fill{height:100%; background:var(--signal);}
+  .focus-pct{font-family:var(--mono); font-size:11px; color:var(--dim); width:36px; text-align:right;}
+  .focus-callout{background:var(--panel2); border-left:3px solid var(--signal); border-radius:8px; padding:12px; margin-top:10px; font-size:12.5px; color:var(--ink); line-height:1.5;}
+
+  .diet-block{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px;}
+  .diet-time{font-family:var(--mono); font-size:11px; color:var(--signal);}
+  .diet-title{font-size:14px; font-weight:700; margin-top:2px;}
+  .diet-desc{font-size:12.5px; color:var(--dim); margin-top:4px; line-height:1.55;}
+  .diet-note{font-size:12px; color:var(--dim); background:var(--panel2); border-radius:10px; padding:12px; margin-top:14px; line-height:1.6;}
+  .workout-day{background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px; margin-bottom:10px;}
+  .workout-day-title{font-size:13px; font-weight:700; color:var(--signal);}
+  .workout-list{margin:8px 0 0; padding-left:18px; font-size:12.5px; color:var(--dim); line-height:1.7;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">Rokis · Personal Ops</div>
+  <h1>Daily Ops Tracker</h1>
+  <div class="datebar">
+    <button id="prevDay">‹</button>
+    <div class="dateLabel" id="dateLabel">—</div>
+    <button id="nextDay">›</button>
+  </div>
+  <div class="savedLine" id="savedLine"></div>
+  <div class="tabs">
+    <div class="tab active" data-view="day">Today</div>
+    <div class="tab" data-view="diet">Diet & Workout</div>
+    <div class="tab" data-view="month">Month</div>
+  </div>
+</header>
+
+<main>
+  <!-- DAY VIEW -->
+  <div class="view active" id="view-day">
+
+    <div class="same-reason-bar">
+      <span id="sameReasonLabel">All of today's exceptions share the same reason &amp; rating</span>
+      <label class="switch">
+        <input type="checkbox" id="sameReasonToggle">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div id="commonReasonWrap" style="display:none; margin-bottom:14px;">
+      <input class="textin" id="commonReasonInput" placeholder="Common reason for all exceptions today (e.g. travel, unwell, unexpected work call)">
+      <div class="quality-row" id="commonQualityRow">
+        <div class="quality-pill" data-q="good">Good</div>
+        <div class="quality-pill" data-q="medium">Medium</div>
+        <div class="quality-pill" data-q="bad">Bad</div>
+      </div>
+    </div>
+
+    <div class="section-title">Schedule</div>
+    <div id="blocksWrap"></div>
+
+    <div class="section-title">Health metrics</div>
+
+    <div class="card">
+      <div class="card-title">Water intake — target 3 litres (12 glasses)</div>
+      <div class="water-track" id="waterTrack"></div>
+      <div class="counter-sub" id="waterCount" style="margin-top:8px;">0 / 12 glasses</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Diet plan followed today?</div>
+      <div class="row-center">
+        <label class="switch"><input type="checkbox" id="dietToggle"><span class="slider"></span></label>
+        <span class="counter-sub" id="dietStatus">Not followed</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Sleep quality (last night)</div>
+      <div class="stars" id="sleepStars">
+        <span class="star" data-v="1">★</span><span class="star" data-v="2">★</span>
+        <span class="star" data-v="3">★</span><span class="star" data-v="4">★</span>
+        <span class="star" data-v="5">★</span>
+      </div>
+    </div>
+
+    <div class="section-title">Urge control — how many times &amp; how long</div>
+    <div class="card">
+      <div class="stat-row" style="margin-bottom:14px;">
+        <div class="stat"><div class="stat-num" id="urgeCountToday">0</div><div class="stat-label">Times today</div></div>
+        <div class="stat"><div class="stat-num" id="urgeHoursToday">0.0</div><div class="stat-label">Hours today</div></div>
+      </div>
+      <div class="card-title">Log a session (minutes)</div>
+      <div class="session-row">
+        <select id="minSelect">
+          <option value="5">5 min</option><option value="10">10 min</option>
+          <option value="15">15 min</option><option value="20">20 min</option>
+          <option value="30">30 min</option><option value="45">45 min</option><option value="60">60 min</option>
+        </select>
+        <button id="addSessionBtn">+ Log one</button>
+      </div>
+      <div class="session-list" id="sessionList"></div>
+      <div class="streak" id="streakLine">Streak: —</div>
+    </div>
+
+    <div class="section-title">Notes</div>
+    <textarea class="note" id="dayNote" placeholder="Anything else worth logging — SW night call, mood, energy, unexpected plan, etc."></textarea>
+
+    <div class="save-bar"><button class="btn btn-primary" id="saveBtn">Save day</button></div>
+  </div>
+
+  <!-- DIET & WORKOUT VIEW -->
+  <div class="view" id="view-diet">
+    <div class="section-title">Goal: lean, tight, high-stamina build</div>
+    <div class="diet-note" style="margin-top:0;">
+      Built around your 06:45–07:30 gym slot and your existing meals. General framework, not a clinical plan — for exact cut/bulk numbers, a trainer or nutritionist who can see your real measurements will get you further.
+    </div>
+    <div class="diet-note">
+      From what you shared: you're a lean, slim-built frame with low body fat already — the "tight" look you want is mostly a muscle-building job, not a fat-cutting one. That changes the plan: prioritise slightly higher calories with a protein surplus and progressive overload (more reps/weight over time), rather than restriction. Definition follows once there's more muscle underneath, especially chest, shoulders and core.
+    </div>
+
+    <div class="section-title">Daily nutrition</div>
+    <div class="diet-block">
+      <div class="diet-time">On waking (04:30)</div>
+      <div class="diet-title">Warm water + soaked seeds</div>
+      <div class="diet-desc">Warm water first, then soaked moringa seeds / methi / chia if available. No sugar drinks.</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-time">06:00–06:30 prep → 07:30 after gym</div>
+      <div class="diet-title">Protein-forward breakfast</div>
+      <div class="diet-desc">Eggs / sprouts / paneer / oats with nuts, eaten right after gym for recovery. This is the meal that builds stamina — don't skip protein here.</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-time">Midday</div>
+      <div class="diet-title">Plate-half rule</div>
+      <div class="diet-desc">Rice okay, but vegetables/salad/curd fill half the plate first, rice second, plus a protein side (fish/chicken/lentils/paneer).</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-time">19:00–20:00</div>
+      <div class="diet-title">Light dinner, early cutoff</div>
+      <div class="diet-desc">2 chapathis + vegetable/dal. Finish by ~20:00–20:30 so digestion doesn't fight sleep quality.</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-time">Through the day</div>
+      <div class="diet-title">Hydration + your own moringa</div>
+      <div class="diet-desc">3L water spread through the day. A teaspoon of your own MURI moringa powder in warm water or smoothie is a solid stamina/micronutrient add — you're already sourcing it.</div>
+    </div>
+
+    <div class="section-title">Workout — limited equipment (45 min, 06:45–07:30)</div>
+    <div class="diet-note" style="margin-top:0;">Assumes dumbbells, a resistance band, a pull-up bar and bodyweight — no machines needed.</div>
+
+    <div class="workout-day">
+      <div class="workout-day-title">Mon — Push (chest, shoulders, triceps)</div>
+      <ul class="workout-list">
+        <li>Dumbbell floor press or push-ups — 4 sets</li>
+        <li>Band/dumbbell shoulder press — 3 sets</li>
+        <li>Dips on a sturdy chair/bench — 3 sets</li>
+        <li>Plank finisher — 3 rounds</li>
+      </ul>
+    </div>
+    <div class="workout-day">
+      <div class="workout-day-title">Tue — Pull (back, biceps)</div>
+      <ul class="workout-list">
+        <li>Pull-ups (assisted with band if needed) — 4 sets</li>
+        <li>Dumbbell or band rows — 3 sets</li>
+        <li>Dumbbell curls — 3 sets</li>
+        <li>Dead hang for grip/back — 2 rounds</li>
+      </ul>
+    </div>
+    <div class="workout-day">
+      <div class="workout-day-title">Wed — Legs &amp; core (builds the "tight" midsection)</div>
+      <ul class="workout-list">
+        <li>Goblet squats (dumbbell) — 4 sets</li>
+        <li>Walking lunges — 3 sets</li>
+        <li>Glute bridges — 3 sets</li>
+        <li>Hanging knee raises / plank — 3 sets</li>
+      </ul>
+    </div>
+    <div class="workout-day">
+      <div class="workout-day-title">Thu — Stamina / conditioning</div>
+      <ul class="workout-list">
+        <li>Jump rope or high-knee sprints — 6 x 1 min, 30 sec rest</li>
+        <li>Burpees — 4 sets of 10</li>
+        <li>Mountain climbers — 4 sets of 30 sec</li>
+        <li>Slow-breathing cooldown — 3 min (recovery quality matters as much as effort)</li>
+      </ul>
+    </div>
+    <div class="workout-day">
+      <div class="workout-day-title">Fri — Full-body circuit</div>
+      <ul class="workout-list">
+        <li>Push-ups, rows, squats, plank — circuit style, 3–4 rounds</li>
+        <li>Finish with band shoulder work</li>
+      </ul>
+    </div>
+    <div class="workout-day">
+      <div class="workout-day-title">Sat / Sun — Mobility + light stamina</div>
+      <ul class="workout-list">
+        <li>Light jog or brisk walk, stretching, band mobility work</li>
+        <li>Keeps recovery active without adding fatigue before your business sprint hours</li>
+      </ul>
+    </div>
+
+    <div class="section-title">Brain focus &amp; stamina — daily habits</div>
+    <div class="diet-block">
+      <div class="diet-title">Fuel for focus</div>
+      <div class="diet-desc">Walnuts, flaxseed, fish (omega-3), and your moringa powder support mental clarity. Green tea instead of a second coffee mid-morning keeps focus steadier without a crash.</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-title">Protect sleep — it's the real "brain" lever</div>
+      <div class="diet-desc">Your 04:30 wake-up only works long-term if you're actually asleep by ~22:30–23:00. No phone in the last 20 minutes before bed — screen light right before sleep is the single biggest thing quietly cutting into next-day focus.</div>
+    </div>
+    <div class="diet-block">
+      <div class="diet-title">2-minute reset between work blocks</div>
+      <div class="diet-desc">Before switching from office work to business work (or business to GF time), 10 slow breaths or a short walk resets attention better than pushing straight through — small thing, compounds over a month.</div>
+    </div>
+  </div>
+
+  <!-- MONTH VIEW -->
+  <div class="view" id="view-month">
+    <div class="card rating-hero">
+      <div class="card-title">Overall month rating</div>
+      <div class="rating-stars" id="ratingStars">★★★★★</div>
+      <div class="rating-sub" id="ratingSub">No data yet</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat"><div class="stat-num" id="statDays">0</div><div class="stat-label">Days logged</div></div>
+      <div class="stat"><div class="stat-num" id="statAdherence">0%</div><div class="stat-label">Adherence</div></div>
+      <div class="stat"><div class="stat-num" id="statWater">0%</div><div class="stat-label">Water goal</div></div>
+      <div class="stat"><div class="stat-num" id="statDiet">0%</div><div class="stat-label">Diet followed</div></div>
+      <div class="stat"><div class="stat-num" id="statUrgeCount">0</div><div class="stat-label">Urge times total</div></div>
+      <div class="stat"><div class="stat-num" id="statUrgeHrs">0.0</div><div class="stat-label">Urge hrs total</div></div>
+    </div>
+
+    <div class="month-grid" id="monthGrid"></div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Where the month went (avg. daily hours by category)</div>
+      <div class="chart-canvas-box">
+        <canvas id="pieChart" height="240"></canvas>
+        <div class="empty" id="pieEmpty" style="display:none;">No completed blocks logged yet this month.</div>
+      </div>
+      <div class="legend" id="pieLegend"></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Which part needs more focus</div>
+      <div class="focus-list" id="focusList"></div>
+      <div class="focus-callout" id="focusCallout"></div>
+    </div>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Urge-control trend — hours per day</div>
+      <div class="chart-canvas-box">
+        <canvas id="urgeChart" height="180"></canvas>
+        <div class="empty" id="urgeEmpty" style="display:none;">No days logged yet this month.</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// ================= Schedule =================
+function scheduleFor(dateObj){
+  const day = dateObj.getDay(); // 0 Sun .. 6 Sat
+  const isWeekend = (day===0 || day===6);
+
+  if(isWeekend){
+    return [
+      {t:"04:30–04:45", l:"Wake up", cat:"Health", h:0.25},
+      {t:"04:45–05:30", l:"Learn", cat:"Growth", h:0.75},
+      {t:"05:30–06:00", l:"Book reading", cat:"Growth", h:0.5},
+      {t:"06:00–06:30", l:"Prepare morning food", cat:"Personal", h:0.5},
+      {t:"06:45–07:30", l:"Gym", cat:"Health", h:0.75},
+      {t:"07:30–08:00", l:"Bath and eat", cat:"Personal", h:0.5},
+      {t:"08:00–08:45", l:"Call with girlfriend", cat:"Relationship", h:0.75},
+      {t:"09:00–13:00", l:"Business — work & promotion", cat:"Business", h:4},
+      {t:"13:00–14:00", l:"Lunch", cat:"Personal", h:1},
+      {t:"14:00–16:00", l:"Personal work", cat:"Personal", h:2},
+      {t:"16:00–20:00", l:"Business — work & promotion", cat:"Business", h:4},
+      {t:"20:00–22:00", l:"Call with girlfriend", cat:"Relationship", h:2},
+      {t:"22:00–22:30", l:"Prepare for next day → sleep", cat:"Health", h:0.5},
+    ];
+  }
+  return [
+    {t:"04:30–04:45", l:"Wake up", cat:"Health", h:0.25},
+    {t:"04:45–05:30", l:"Learn", cat:"Growth", h:0.75},
+    {t:"05:30–06:00", l:"Book reading", cat:"Growth", h:0.5},
+    {t:"06:00–06:30", l:"Prepare morning food", cat:"Personal", h:0.5},
+    {t:"06:45–07:30", l:"Gym", cat:"Health", h:0.75},
+    {t:"07:30–08:00", l:"Bath and eat", cat:"Personal", h:0.5},
+    {t:"08:00–08:45", l:"Call with girlfriend", cat:"Relationship", h:0.75},
+    {t:"08:50–18:45", l:"Work + generate 2 AI videos (business) at break", cat:"Office", h:9.9},
+    {t:"19:00–19:30", l:"Reach room with food", cat:"Personal", h:0.5},
+    {t:"19:30–20:00", l:"Call with gf, eat, refresh", cat:"Relationship", h:0.5},
+    {t:"20:00–21:00", l:"Business — check & take action", cat:"Business", h:1},
+    {t:"21:00–21:30", l:"Analyse & me-time", cat:"Personal", h:0.5},
+    {t:"21:30–22:30", l:"Girlfriend connect", cat:"Relationship", h:1},
+    {t:"22:30–23:00", l:"Prepare for next day → sleep", cat:"Health", h:0.5},
+  ];
+}
+
+const CAT_COLORS = {
+  Health:"#3BB273", Growth:"#4C9CE8", Relationship:"#E85C9C",
+  Office:"#7C8794", Personal:"#F2A93B", Business:"#D9534F"
+};
+
+// ================= State & storage =================
+let currentDate = new Date();
+let currentView = "day";
+const WATER_TARGET = 12;
+const USE_CLAUDE_STORAGE = (typeof window.storage !== 'undefined');
+
+function fmtKey(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,'0')+"-"+String(d.getDate()).padStart(2,'0'); }
+function fmtLabel(d){ return d.toLocaleDateString('en-IN',{weekday:'short', day:'numeric', month:'short', year:'numeric'}); }
+
+async function loadDay(d){
+  const key = "day:"+fmtKey(d);
+  try{
+    if(USE_CLAUDE_STORAGE){
+      const res = await window.storage.get(key, false);
+      return res ? JSON.parse(res.value) : null;
+    } else {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    }
+  }catch(e){ return null; }
+}
+async function saveDay(d, data){
+  const key = "day:"+fmtKey(d);
+  try{
+    if(USE_CLAUDE_STORAGE){ await window.storage.set(key, JSON.stringify(data), false); }
+    else { localStorage.setItem(key, JSON.stringify(data)); }
+  }catch(e){ console.error(e); }
+}
+
+function defaultState(){
+  return {
+    blocks:{}, blockExceptions:{}, sameReasonAll:false, commonReason:"", commonQuality:"medium",
+    water:0, diet:false, sleep:0, sessions:[], note:"", savedAt:""
+  };
+}
+const QUALITY_SCORE = {good:1, medium:0.5, bad:0};
+let dayState = defaultState();
+
+// ================= Render helpers =================
+function renderWaterTrack(){
+  const track = document.getElementById('waterTrack');
+  track.innerHTML = "";
+  for(let i=1;i<=WATER_TARGET;i++){
+    const d = document.createElement('div');
+    d.className = 'water-drop' + (i<=dayState.water ? ' on':'');
+    d.textContent = '💧';
+    d.addEventListener('click', ()=>{
+      dayState.water = (dayState.water===i) ? i-1 : i;
+      renderWaterTrack();
+    });
+    track.appendChild(d);
+  }
+  document.getElementById('waterCount').textContent = `${dayState.water} / ${WATER_TARGET} glasses`;
+}
+function renderSleepStars(){
+  document.querySelectorAll('#sleepStars .star').forEach(s=>{
+    s.classList.toggle('on', +s.dataset.v <= (dayState.sleep||0));
+  });
+}
+function renderSessions(){
+  const list = document.getElementById('sessionList');
+  list.innerHTML = "";
+  (dayState.sessions||[]).forEach((m, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'session-item';
+    row.innerHTML = `<span>${m} min logged</span><button data-idx="${idx}">remove</button>`;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ dayState.sessions.splice(+btn.dataset.idx,1); renderSessions(); });
+  });
+  const sess = dayState.sessions||[];
+  const totalMin = sess.reduce((a,b)=>a+b,0);
+  document.getElementById('urgeCountToday').textContent = sess.length;
+  document.getElementById('urgeHoursToday').textContent = (totalMin/60).toFixed(1);
+}
+
+function renderBlocks(sched){
+  const wrap = document.getElementById('blocksWrap');
+  wrap.innerHTML = "";
+  const sameAll = dayState.sameReasonAll;
+
+  sched.forEach((b,i)=>{
+    const done = !!dayState.blocks[i];
+    const exc = dayState.blockExceptions[i] || {on:false, reason:""};
+    const el = document.createElement('div');
+    el.className = 'block' + (done && !exc.on ? ' done':'') + (exc.on ? ' excepted':'');
+
+    let reasonHtml = "";
+    if(exc.on && !sameAll){
+      const q = exc.quality || "medium";
+      reasonHtml = `<div class="reason-wrap">
+        <input class="textin reason-input" data-idx="${i}" placeholder="Reason for exception" value="${(exc.reason||"").replace(/"/g,'&quot;')}">
+        <div class="quality-row block-quality-row" data-idx="${i}">
+          <div class="quality-pill ${q==='good'?'on':''}" data-q="good" data-idx="${i}">Good</div>
+          <div class="quality-pill ${q==='medium'?'on':''}" data-q="medium" data-idx="${i}">Medium</div>
+          <div class="quality-pill ${q==='bad'?'on':''}" data-q="bad" data-idx="${i}">Bad</div>
+        </div>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div class="block-top">
+        <div class="check ${done && !exc.on?'on':''} ${exc.on?'disabled':''}" data-idx="${i}">✓</div>
+        <div class="btxt">
+          <div class="btime">${b.t}</div>
+          <div class="blabel">${b.l}</div>
+          <div class="bcat">${b.cat}</div>
+        </div>
+        <div class="exc-pill ${exc.on?'on':''}" data-idx="${i}">${exc.on?'Exception ✓':'Exception'}</div>
+      </div>
+      ${reasonHtml}
+    `;
+    wrap.appendChild(el);
+  });
+
+  wrap.querySelectorAll('.check').forEach(chk=>{
+    chk.addEventListener('click', ()=>{
+      const idx = chk.dataset.idx;
+      const exc = dayState.blockExceptions[idx];
+      if(exc && exc.on) return; // can't mark done while excepted
+      dayState.blocks[idx] = !dayState.blocks[idx];
+      renderBlocks(sched);
+    });
+  });
+  wrap.querySelectorAll('.exc-pill').forEach(pill=>{
+    pill.addEventListener('click', ()=>{
+      const idx = pill.dataset.idx;
+      if(!dayState.blockExceptions[idx]) dayState.blockExceptions[idx] = {on:false, reason:"", quality:"medium"};
+      dayState.blockExceptions[idx].on = !dayState.blockExceptions[idx].on;
+      if(dayState.blockExceptions[idx].on && dayState.sameReasonAll){
+        dayState.blockExceptions[idx].reason = dayState.commonReason;
+        dayState.blockExceptions[idx].quality = dayState.commonQuality;
+      }
+      renderBlocks(sched);
+    });
+  });
+  wrap.querySelectorAll('.reason-input').forEach(inp=>{
+    inp.addEventListener('input', ()=>{
+      const idx = inp.dataset.idx;
+      if(!dayState.blockExceptions[idx]) dayState.blockExceptions[idx] = {on:true, reason:"", quality:"medium"};
+      dayState.blockExceptions[idx].reason = inp.value;
+    });
+  });
+  wrap.querySelectorAll('.block-quality-row .quality-pill').forEach(pill=>{
+    pill.addEventListener('click', ()=>{
+      const idx = pill.dataset.idx;
+      const q = pill.dataset.q;
+      if(!dayState.blockExceptions[idx]) dayState.blockExceptions[idx] = {on:true, reason:"", quality:"medium"};
+      dayState.blockExceptions[idx].quality = q;
+      renderBlocks(sched);
+    });
+  });
+}
+
+async function renderDay(){
+  document.getElementById('dateLabel').textContent = fmtLabel(currentDate);
+  const sched = scheduleFor(currentDate);
+  const saved = await loadDay(currentDate);
+  dayState = saved || defaultState();
+  if(!dayState.sessions) dayState.sessions = [];
+  if(!dayState.blockExceptions) dayState.blockExceptions = {};
+
+  document.getElementById('sameReasonToggle').checked = !!dayState.sameReasonAll;
+  document.getElementById('commonReasonWrap').style.display = dayState.sameReasonAll ? 'block' : 'none';
+  document.getElementById('commonReasonInput').value = dayState.commonReason || "";
+  document.querySelectorAll('#commonQualityRow .quality-pill').forEach(p=>{
+    p.classList.toggle('on', p.dataset.q === (dayState.commonQuality||'medium'));
+  });
+  document.getElementById('dayNote').value = dayState.note || "";
+  document.getElementById('dietToggle').checked = !!dayState.diet;
+  document.getElementById('dietStatus').textContent = dayState.diet ? "Followed" : "Not followed";
+  document.getElementById('savedLine').textContent = dayState.savedAt ? `Last saved: ${dayState.savedAt}` : "";
+
+  renderWaterTrack();
+  renderSleepStars();
+  renderSessions();
+  renderBlocks(sched);
+
+  // streak: consecutive days back from today with zero session minutes
+  let streak = 0;
+  let probe = new Date(currentDate);
+  while(true){
+    const pd = await loadDay(probe);
+    if(pd && (pd.sessions||[]).reduce((a,b)=>a+b,0) === 0){ streak++; probe.setDate(probe.getDate()-1); }
+    else break;
+    if(streak > 365) break;
+  }
+  document.getElementById('streakLine').textContent = streak>0 ? `Streak: ${streak} day${streak>1?'s':''} at zero` : "Streak: log today to start";
+}
+
+document.getElementById('prevDay').onclick = ()=>{ currentDate.setDate(currentDate.getDate()-1); renderDay(); };
+document.getElementById('nextDay').onclick = ()=>{ currentDate.setDate(currentDate.getDate()+1); renderDay(); };
+
+document.getElementById('sameReasonToggle').addEventListener('change', (e)=>{
+  dayState.sameReasonAll = e.target.checked;
+  document.getElementById('commonReasonWrap').style.display = e.target.checked ? 'block' : 'none';
+  if(e.target.checked){
+    Object.keys(dayState.blockExceptions).forEach(idx=>{
+      if(dayState.blockExceptions[idx].on){
+        dayState.blockExceptions[idx].reason = dayState.commonReason;
+        dayState.blockExceptions[idx].quality = dayState.commonQuality;
+      }
+    });
+  }
+  renderBlocks(scheduleFor(currentDate));
+});
+document.getElementById('commonReasonInput').addEventListener('input', (e)=>{
+  dayState.commonReason = e.target.value;
+  if(dayState.sameReasonAll){
+    Object.keys(dayState.blockExceptions).forEach(idx=>{
+      if(dayState.blockExceptions[idx].on) dayState.blockExceptions[idx].reason = e.target.value;
+    });
+  }
+});
+document.querySelectorAll('#commonQualityRow .quality-pill').forEach(pill=>{
+  pill.addEventListener('click', ()=>{
+    dayState.commonQuality = pill.dataset.q;
+    document.querySelectorAll('#commonQualityRow .quality-pill').forEach(p=>p.classList.toggle('on', p===pill));
+    if(dayState.sameReasonAll){
+      Object.keys(dayState.blockExceptions).forEach(idx=>{
+        if(dayState.blockExceptions[idx].on) dayState.blockExceptions[idx].quality = pill.dataset.q;
+      });
+    }
+  });
+});
+document.getElementById('dietToggle').addEventListener('change', (e)=>{
+  dayState.diet = e.target.checked;
+  document.getElementById('dietStatus').textContent = e.target.checked ? "Followed" : "Not followed";
+});
+document.querySelectorAll('#sleepStars .star').forEach(s=>{
+  s.addEventListener('click', ()=>{ dayState.sleep = +s.dataset.v; renderSleepStars(); });
+});
+document.getElementById('addSessionBtn').addEventListener('click', ()=>{
+  const mins = +document.getElementById('minSelect').value;
+  if(!dayState.sessions) dayState.sessions = [];
+  dayState.sessions.push(mins);
+  renderSessions();
+});
+
+document.getElementById('saveBtn').onclick = async ()=>{
+  dayState.note = document.getElementById('dayNote').value;
+  dayState.savedAt = new Date().toLocaleString('en-IN', {dateStyle:'medium', timeStyle:'short'});
+  await saveDay(currentDate, dayState);
+  document.getElementById('savedLine').textContent = `Last saved: ${dayState.savedAt}`;
+  const btn = document.getElementById('saveBtn');
+  const orig = btn.textContent;
+  btn.textContent = "Saved ✓";
+  setTimeout(()=>btn.textContent=orig, 1200);
+  if(currentView==='month') renderMonth();
+};
+
+// ================= Tabs =================
+document.querySelectorAll('.tab').forEach(tab=>{
+  tab.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    tab.classList.add('active');
+    currentView = tab.dataset.view;
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('view-'+currentView).classList.add('active');
+    if(currentView==='month') renderMonth();
+  });
+});
+
+// ================= Month view =================
+let pieChartInst=null, urgeChartInst=null;
+
+async function renderMonth(){
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = new Date(year, month+1, 0).getDate();
+  const today = new Date();
+
+  const grid = document.getElementById('monthGrid');
+  grid.innerHTML = "";
+
+  let daysLogged=0, totalBlocks=0, doneBlocks=0;
+  let urgeHoursTotal=0, urgeCountTotal=0, waterHitDays=0, dietDays=0, sleepSum=0, sleepDays=0;
+  const catHours = {};
+  const catStats = {}; // {cat: {planned, done}} — done can be fractional (quality-weighted exceptions)
+  const urgeSeries = [];
+
+  for(let day=1; day<=daysInMonth; day++){
+    const d = new Date(year, month, day);
+    const rec = await loadDay(d);
+    const sched = scheduleFor(d);
+
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    cell.textContent = day;
+    if(fmtKey(d)===fmtKey(today)) cell.classList.add('today');
+
+    if(rec){
+      daysLogged++;
+      const sess = rec.sessions||[];
+      const mins = sess.reduce((a,b)=>a+b,0);
+      urgeHoursTotal += mins/60;
+      urgeCountTotal += sess.length;
+      urgeSeries.push({day, hrs:+(mins/60).toFixed(2)});
+      if((rec.water||0) >= WATER_TARGET) waterHitDays++;
+      if(rec.diet) dietDays++;
+      if(rec.sleep){ sleepSum += rec.sleep; sleepDays++; }
+
+      let anyDone=false;
+      sched.forEach((b,i)=>{
+        const excObj = rec.blockExceptions && rec.blockExceptions[i];
+        const exc = excObj && excObj.on;
+        if(!catStats[b.cat]) catStats[b.cat] = {planned:0, done:0};
+        totalBlocks++;
+        catStats[b.cat].planned++;
+        if(exc){
+          // honest exception rating still counts toward the score, weighted by quality
+          const qScore = QUALITY_SCORE[excObj.quality] ?? 0.5;
+          doneBlocks += qScore;
+          catStats[b.cat].done += qScore;
+          if(qScore>0) anyDone=true;
+        } else if(rec.blocks && rec.blocks[i]){
+          doneBlocks++; anyDone=true;
+          catStats[b.cat].done++;
+          catHours[b.cat] = (catHours[b.cat]||0) + b.h;
+        }
+      });
+      if(anyDone) cell.classList.add('filled');
+    }
+    grid.appendChild(cell);
+  }
+
+  const adherencePct = totalBlocks ? Math.round(doneBlocks/totalBlocks*100) : 0;
+  const waterPct = daysLogged ? Math.round(waterHitDays/daysLogged*100) : 0;
+  const dietPct = daysLogged ? Math.round(dietDays/daysLogged*100) : 0;
+  const sleepPct = sleepDays ? Math.round((sleepSum/sleepDays)/5*100) : 0;
+  const avgUrgeHrsPerDay = daysLogged ? urgeHoursTotal/daysLogged : 0;
+  const urgeScorePct = Math.max(0, Math.round(100 - Math.min(100, avgUrgeHrsPerDay*50)));
+
+  document.getElementById('statDays').textContent = daysLogged;
+  document.getElementById('statAdherence').textContent = adherencePct+'%';
+  document.getElementById('statWater').textContent = waterPct+'%';
+  document.getElementById('statDiet').textContent = dietPct+'%';
+  document.getElementById('statUrgeCount').textContent = urgeCountTotal;
+  document.getElementById('statUrgeHrs').textContent = urgeHoursTotal.toFixed(1);
+
+  // Overall star rating
+  const compositeScore = daysLogged
+    ? (adherencePct*0.35 + waterPct*0.15 + dietPct*0.2 + sleepPct*0.15 + urgeScorePct*0.15)
+    : 0;
+  const starCount = daysLogged ? Math.max(1, Math.min(5, Math.round(compositeScore/20))) : 0;
+  let starsHtml = "";
+  for(let i=1;i<=5;i++) starsHtml += `<span class="${i<=starCount?'on':'off'}">★</span>`;
+  document.getElementById('ratingStars').innerHTML = starsHtml || "☆☆☆☆☆";
+  document.getElementById('ratingSub').textContent = daysLogged
+    ? `${compositeScore.toFixed(0)}/100 composite score across ${daysLogged} logged day${daysLogged>1?'s':''}`
+    : "Log a few days to see your rating";
+
+  // Pie chart
+  const labels = Object.keys(catHours);
+  const denom = daysLogged || 1;
+  const dataVals = labels.map(l => +(catHours[l]/denom).toFixed(2));
+  const colors = labels.map(l => CAT_COLORS[l] || "#888");
+
+  const pieCanvas = document.getElementById('pieChart');
+  const pieEmpty = document.getElementById('pieEmpty');
+  if(pieChartInst){ pieChartInst.destroy(); pieChartInst=null; }
+  if(labels.length===0){
+    pieCanvas.style.display = 'none'; pieEmpty.style.display = 'block';
+  } else {
+    pieCanvas.style.display = 'block'; pieEmpty.style.display = 'none';
+    pieChartInst = new Chart(pieCanvas.getContext('2d'), {
+      type:'pie',
+      data:{ labels, datasets:[{ data:dataVals, backgroundColor:colors, borderColor:'#0B0E11', borderWidth:2 }] },
+      options:{ plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:(c)=> `${c.label}: ${c.raw} hrs/day avg` } } } }
+    });
+  }
+  document.getElementById('pieLegend').innerHTML = labels.map((l,i)=>
+    `<div class="legend-item"><span class="dot" style="background:${colors[i]}"></span>${l} — ${dataVals[i]}h</div>`).join('');
+
+  // Focus areas — combine schedule categories with water/diet/sleep/urge
+  const focusItems = [];
+  Object.keys(catStats).forEach(cat=>{
+    const s = catStats[cat];
+    const pct = s.planned ? Math.round(s.done/s.planned*100) : 0;
+    focusItems.push({label:cat, pct});
+  });
+  focusItems.push({label:"Water", pct:waterPct});
+  focusItems.push({label:"Diet", pct:dietPct});
+  focusItems.push({label:"Sleep", pct:sleepPct});
+  focusItems.push({label:"Urge control", pct:urgeScorePct});
+  focusItems.sort((a,b)=>a.pct-b.pct);
+
+  const focusList = document.getElementById('focusList');
+  if(daysLogged===0){
+    focusList.innerHTML = `<div class="empty">Log a few days to see focus areas.</div>`;
+    document.getElementById('focusCallout').textContent = "";
+  } else {
+    focusList.innerHTML = focusItems.map(f=>`
+      <div class="focus-row">
+        <div class="focus-label">${f.label}</div>
+        <div class="focus-bar-bg"><div class="focus-bar-fill" style="width:${f.pct}%"></div></div>
+        <div class="focus-pct">${f.pct}%</div>
+      </div>`).join('');
+    const weakest = focusItems[0];
+    const second = focusItems[1];
+    document.getElementById('focusCallout').textContent =
+      `Lowest this month: ${weakest.label} (${weakest.pct}%) and ${second.label} (${second.pct}%). Those two are worth the most attention next month — everything else is holding up better.`;
+  }
+
+  // Urge trend chart
+  const urgeCanvas = document.getElementById('urgeChart');
+  const urgeEmpty = document.getElementById('urgeEmpty');
+  if(urgeChartInst){ urgeChartInst.destroy(); urgeChartInst=null; }
+  if(urgeSeries.length===0){
+    urgeCanvas.style.display = 'none'; urgeEmpty.style.display = 'block';
+  } else {
+    urgeCanvas.style.display = 'block'; urgeEmpty.style.display = 'none';
+    urgeChartInst = new Chart(urgeCanvas.getContext('2d'), {
+      type:'bar',
+      data:{ labels: urgeSeries.map(u=>u.day), datasets:[{ data: urgeSeries.map(u=>u.hrs), backgroundColor:'#D9534F' }] },
+      options:{ plugins:{legend:{display:false}},
+        scales:{ x:{ ticks:{color:'#7C8794', font:{size:9}}, grid:{display:false} },
+                 y:{ beginAtZero:true, ticks:{color:'#7C8794'}, grid:{color:'#232A33'} } } }
+    });
+  }
+}
+
+// ================= Init =================
+renderDay();
+</script>
+</body>
+</html>
